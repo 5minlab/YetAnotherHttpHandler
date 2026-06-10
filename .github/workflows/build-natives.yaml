@@ -67,7 +67,7 @@ jobs:
       - name: Run tests
         run: |
             dotnet tool restore
-            dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-win-arm64:
     name: Build Native library (win-arm64)
@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       # Needs to lock glibc version to 2.31 (Issue #30)
-      image: ubuntu:20.04 # Use Ubuntu 20.04 based image
+      image: ubuntu:20.04@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214 # Use Ubuntu 20.04 based image
     timeout-minutes: 30
     defaults:
       run:
@@ -186,7 +186,7 @@ jobs:
       - name: Run tests
         run: |
             dotnet tool restore
-            dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-x64:
     name: Build Native library (osx-x64)
@@ -214,7 +214,7 @@ jobs:
       - name: Run tests
         run: |
             dotnet tool restore
-            dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-arm64:
     name: Build Native library (osx-arm64)
@@ -242,7 +242,7 @@ jobs:
       - name: Run tests
         run: |
             dotnet tool restore
-            dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-universal:
     name: Build Native library (osx-universal)
@@ -462,7 +462,7 @@ jobs:
         with:
           path: native/artifacts
       - run: ls -lFaR native/artifacts
-      - run: dotnet pack -c ${{ env._DOTNET_BUILD_CONFIG }} ./YetAnotherHttpHandler.slnx --include-symbols --include-source -o ./publish
+      - run: dotnet pack -c ${_DOTNET_BUILD_CONFIG} ./YetAnotherHttpHandler.slnx --include-symbols --include-source -o ./publish
       #- run: dotnet test -c ${{ env._DOTNET_BUILD_CONFIG }} ./test/YetAnotherHttpHandler.Packaging.Test
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
