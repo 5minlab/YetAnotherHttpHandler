@@ -67,6 +67,7 @@ jobs:
             native/target/x86_64-pc-windows-msvc/${{ env._RUST_BUILD_CONFIG }}/yaha_native.pdb
           retention-days: 1
       - name: Run tests
+        shell: bash
         run: |
           dotnet tool restore
           dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
@@ -101,9 +102,10 @@ jobs:
             native/target/aarch64-pc-windows-msvc/${{ env._RUST_BUILD_CONFIG }}/yaha_native.pdb
           retention-days: 1
       #- name: Run tests
+      #  shell: bash
       #  run: |
       #      dotnet tool restore
-      #      dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+      #      dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-win-arm64-uwp:
     name: Build Native library (win-arm64-uwp)
@@ -137,9 +139,10 @@ jobs:
             native/target/aarch64-uwp-windows-msvc/${{ env._RUST_BUILD_CONFIG }}/yaha_native.pdb
           retention-days: 1
       #- name: Run tests
+      #  shell: bash
       #  run: |
       #      dotnet tool restore
-      #      dotnet retest -- -c ${{ env._DOTNET_BUILD_CONFIG }} ../test/YetAnotherHttpHandler.Test
+      #      dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-linux-x64:
     name: Build Native library (linux-x64)
