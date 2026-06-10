@@ -3,20 +3,20 @@ on:
   workflow_dispatch:
     inputs:
       build-config:
-        description: 'Build configuration'
+        description: "Build configuration"
         required: true
-        default: 'release'
+        default: "release"
         type: choice
         options:
           - debug
           - release
       build-only-linux:
-        description: 'Build only for Linux'
+        description: "Build only for Linux"
         required: true
         default: false
         type: boolean
       update-unity-native:
-        description: 'Update pre-built libraries for Unity'
+        description: "Update pre-built libraries for Unity"
         required: true
         default: false
         type: boolean
@@ -56,7 +56,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout-ref || github.ref }}
           submodules: true
       - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
-      - run: cargo build --target x86_64-pc-windows-msvc --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target x86_64-pc-windows-msvc --profile ${env:PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: win-x64
@@ -66,8 +68,8 @@ jobs:
           retention-days: 1
       - name: Run tests
         run: |
-            dotnet tool restore
-            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
+          dotnet tool restore
+          dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-win-arm64:
     name: Build Native library (win-arm64)
@@ -88,7 +90,9 @@ jobs:
       - run: rustup target add aarch64-pc-windows-msvc
       - run: |
           $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\bin"
-          cargo build --target aarch64-pc-windows-msvc --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+          cargo build --target aarch64-pc-windows-msvc --profile ${env:PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: win-arm64
@@ -122,7 +126,9 @@ jobs:
       - run: rustup default nightly-2024-07-10
       - run: |
           $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\bin"
-          cargo -Z build-std build --target aarch64-uwp-windows-msvc --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+          cargo -Z build-std build --target aarch64-uwp-windows-msvc --profile ${env:PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: win-arm64-uwp
@@ -177,7 +183,9 @@ jobs:
           submodules: true
       - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
       - uses: actions-rust-lang/setup-rust-toolchain@2fcdc490d667999e01ddbbf0f2823181beef6b39 # v1.15.0
-      - run: cargo build --target x86_64-unknown-linux-gnu --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target x86_64-unknown-linux-gnu --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: linux-x64
@@ -185,8 +193,8 @@ jobs:
           retention-days: 1
       - name: Run tests
         run: |
-            dotnet tool restore
-            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
+          dotnet tool restore
+          dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-x64:
     name: Build Native library (osx-x64)
@@ -205,7 +213,9 @@ jobs:
           submodules: true
       - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
       - run: rustup target add x86_64-apple-darwin
-      - run: cargo build --target x86_64-apple-darwin --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target x86_64-apple-darwin --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: osx-x64
@@ -213,8 +223,8 @@ jobs:
           retention-days: 1
       - name: Run tests
         run: |
-            dotnet tool restore
-            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
+          dotnet tool restore
+          dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-arm64:
     name: Build Native library (osx-arm64)
@@ -233,7 +243,9 @@ jobs:
           submodules: true
       - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
       - run: rustup target add aarch64-apple-darwin
-      - run: cargo build --target aarch64-apple-darwin --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target aarch64-apple-darwin --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: osx-arm64
@@ -241,13 +253,13 @@ jobs:
           retention-days: 1
       - name: Run tests
         run: |
-            dotnet tool restore
-            dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
+          dotnet tool restore
+          dotnet retest -- -c ${_DOTNET_BUILD_CONFIG} ../test/YetAnotherHttpHandler.Test
 
   build-osx-universal:
     name: Build Native library (osx-universal)
     if: ${{ !inputs.build-only-linux }}
-    needs: [ build-osx-x64, build-osx-arm64 ]
+    needs: [build-osx-x64, build-osx-arm64]
     permissions:
       contents: read
     runs-on: macos-15
@@ -283,7 +295,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout-ref || github.ref }}
           submodules: true
       - run: rustup target add x86_64-apple-ios
-      - run: cargo build --target x86_64-apple-ios --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target x86_64-apple-ios --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
         env:
           IPHONEOS_DEPLOYMENT_TARGET: 12.0
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
@@ -308,8 +322,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout-ref || github.ref }}
           submodules: true
       - run: rustup target add aarch64-apple-ios
-      - run: cargo build --target aarch64-apple-ios --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target aarch64-apple-ios --profile ${PROFILE}
         env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
           IPHONEOS_DEPLOYMENT_TARGET: 12.0
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
@@ -333,8 +348,9 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.checkout-ref || github.ref }}
           submodules: true
       - run: rustup target add aarch64-apple-ios-sim
-      - run: cargo build --target aarch64-apple-ios-sim --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo build --target aarch64-apple-ios-sim --profile ${PROFILE}
         env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
           IPHONEOS_DEPLOYMENT_TARGET: 12.0
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
@@ -365,7 +381,9 @@ jobs:
       - run: sudo apt update && sudo apt install gcc-multilib
       - run: rustup target add armv7-linux-androideabi
       - run: cargo install cargo-ndk
-      - run: cargo ndk -t armeabi-v7a build --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo ndk -t armeabi-v7a build --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: android-arm
@@ -395,7 +413,9 @@ jobs:
       - run: sudo apt update && sudo apt install gcc-multilib
       - run: rustup target add aarch64-linux-android
       - run: cargo install cargo-ndk
-      - run: cargo ndk -t arm64-v8a build --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo ndk -t arm64-v8a build --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: android-arm64
@@ -425,7 +445,9 @@ jobs:
       - run: sudo apt update && sudo apt install gcc-multilib
       - run: rustup target add x86_64-linux-android
       - run: cargo install cargo-ndk
-      - run: cargo ndk -t x86_64 build --profile ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
+      - run: cargo ndk -t x86_64 build --profile ${PROFILE}
+        env:
+          PROFILE: ${{ env._RUST_BUILD_CONFIG == 'debug' && 'dev' || env._RUST_BUILD_CONFIG }}
       - uses: Cysharp/Actions/.github/actions/upload-artifact@main
         with:
           name: android-x64
@@ -473,7 +495,7 @@ jobs:
   update-unity-native:
     name: Update pre-built libraries for Unity
     if: ${{ inputs.update-unity-native && (inputs.build-only-linux && needs.build-dotnet.result == 'success' || success()) }}
-    needs: [ build-dotnet ]
+    needs: [build-dotnet]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
