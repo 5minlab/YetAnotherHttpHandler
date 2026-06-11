@@ -307,9 +307,9 @@ namespace Cysharp.Net.Http
             _cancellationTokenSource.Cancel(); // Stop reading the request body.
         }
 
-        public void CompleteAsFailed(string errorMessage, uint h2ErrorCode)
+        public void CompleteAsFailed(string errorMessage, uint h2ErrorCode, Http2ErrorFlags h2ErrorFlags)
         {
-            Response.CompleteAsFailed(errorMessage, h2ErrorCode);
+            Response.CompleteAsFailed(errorMessage, h2ErrorCode, h2ErrorFlags);
             _cancellationTokenSource.Cancel(); // Stop reading the request body.
         }
 

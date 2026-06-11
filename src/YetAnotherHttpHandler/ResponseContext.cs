@@ -121,23 +121,15 @@ namespace Cysharp.Net.Http
             _tokenRegistration.Dispose();
         }
 
-        public void CompleteAsFailed(string errorMessage, uint h2ErrorCode)
+        public void CompleteAsFailed(string errorMessage, uint h2ErrorCode, Http2ErrorFlags h2ErrorFlags)
         {
-            if (YahaEventSource.Log.IsEnabled()) YahaEventSource.Log.Trace($"[ReqSeq:{_requestContext.RequestSequence}] Response completed with failure ({errorMessage}) (0x{h2ErrorCode:x})");
+            if (YahaEventSource.Log.IsEnabled()) YahaEventSource.Log.Trace($"[ReqSeq:{_requestContext.RequestSequence}] Response completed with failure ({errorMessage}) (0x{h2ErrorCode:x}, flags=0x{(uint)h2ErrorFlags:x})");
 
             lock (_writeLock)
             {
                 if (_completed) return;
 
-                Exception ex = new IOException(errorMessage);
-                if (h2ErrorCode != 0)
-                {
-#if NET7_0_OR_GREATER
-                    ex = new HttpProtocolException(h2ErrorCode, $"The HTTP/2 server closed the connection or reset the stream. HTTP/2 error code '{Http2ErrorCode.ToName(h2ErrorCode)}' (0x{h2ErrorCode:x}).", ex);
-#else
-                    ex = new Http2StreamException($"The HTTP/2 server closed the connection or reset the stream. HTTP/2 error code '{Http2ErrorCode.ToName(h2ErrorCode)}' (0x{h2ErrorCode:x}).", ex);
-#endif
-                }
+                Exception ex = CreateRequestException(errorMessage, h2ErrorCode, h2ErrorFlags);
 
 #if NET5_0_OR_GREATER
                 ExceptionDispatchInfo.SetCurrentStackTrace(ex);
@@ -194,9 +186,46 @@ namespace Cysharp.Net.Http
 #endif
             catch (Exception e)
             {
+                if (e is HttpRequestException)
+                {
+                    throw;
+                }
+
                 throw new HttpRequestException(e.Message, e);
             }
         }
+
+        internal static Exception CreateRequestException(string errorMessage, uint h2ErrorCode, Http2ErrorFlags h2ErrorFlags)
+        {
+            Exception innerException = new IOException(errorMessage);
+            if (h2ErrorCode != 0)
+            {
+#if NET7_0_OR_GREATER
+                innerException = new HttpProtocolException(h2ErrorCode, $"The HTTP/2 server closed the connection or reset the stream. HTTP/2 error code '{Http2ErrorCode.ToName(h2ErrorCode)}' (0x{h2ErrorCode:x}).", innerException);
+#else
+                innerException = new Http2StreamException($"The HTTP/2 server closed the connection or reset the stream. HTTP/2 error code '{Http2ErrorCode.ToName(h2ErrorCode)}' (0x{h2ErrorCode:x}).", innerException);
+#endif
+            }
+
+            if (h2ErrorFlags == Http2ErrorFlags.None && h2ErrorCode == 0)
+            {
+                return innerException;
+            }
+
+            var httpRequestException = CreateHttpRequestException(h2ErrorCode == 0 ? errorMessage : innerException.Message, innerException);
+            return new YetAnotherHttpRequestException(
+                httpRequestException.Message,
+                httpRequestException,
+                h2ErrorCode,
+                h2ErrorFlags.HasFlag(Http2ErrorFlags.GoAway),
+                h2ErrorFlags.HasFlag(Http2ErrorFlags.Remote),
+                h2ErrorFlags.HasFlag(Http2ErrorFlags.ResetStream));
+        }
+
+        private static HttpRequestException CreateHttpRequestException(string errorMessage, Exception innerException)
+            => innerException is HttpRequestException httpRequestException
+                ? httpRequestException
+                : new HttpRequestException(errorMessage, innerException);
 
         private void WaitForLatestFlush()
         {
@@ -238,5 +267,14 @@ namespace Cysharp.Net.Http
                 _ => "(unknown error)",
             };
         }
+    }
+
+    [Flags]
+    internal enum Http2ErrorFlags : uint
+    {
+        None = 0,
+        GoAway = 0x1,
+        Remote = 0x2,
+        ResetStream = 0x4,
     }
 }

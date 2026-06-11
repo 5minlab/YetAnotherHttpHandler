@@ -1,3 +1,4 @@
+﻿using Cysharp.Net.Http;
 using Microsoft.AspNetCore.Hosting;
 using System.IO.Pipelines;
 using System.Net;
@@ -35,8 +36,9 @@ public class Http1Test(ITestOutputHelper testOutputHelper) : UseTestServerTestBa
         var ex = await Record.ExceptionAsync(async () => (await httpClient.GetAsync($"{server.BaseUri}/")).EnsureSuccessStatusCode());
 
         // Assert
-        Assert.IsType<HttpRequestException>(ex);
-        Assert.Null(((HttpRequestException)ex).StatusCode);
+        Assert.IsType<YetAnotherHttpRequestException>(ex);
+        Assert.IsType<HttpRequestException>(ex.InnerException);
+        Assert.Null(((HttpRequestException)ex.InnerException).StatusCode);
         Assert.Contains("'HTTP_1_1_REQUIRED' (0xd)", ex.Message);
     }
 

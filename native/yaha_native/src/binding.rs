@@ -24,6 +24,42 @@ use crate::{
 };
 use futures_util::StreamExt;
 
+const H2_ERROR_FLAG_GOAWAY: u32 = 0x1;
+const H2_ERROR_FLAG_REMOTE: u32 = 0x2;
+const H2_ERROR_FLAG_RESET: u32 = 0x4;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct Http2ErrorDetails {
+    code: Option<u32>,
+    flags: u32,
+}
+
+fn extract_h2_error_details(err: &(dyn Error + 'static)) -> Option<Http2ErrorDetails> {
+    let mut current = Some(err);
+    while let Some(candidate) = current {
+        if let Some(h2_error) = candidate.downcast_ref::<h2::Error>() {
+            let mut flags = 0;
+            if h2_error.is_go_away() {
+                flags |= H2_ERROR_FLAG_GOAWAY;
+            }
+            if h2_error.is_remote() {
+                flags |= H2_ERROR_FLAG_REMOTE;
+            }
+            if h2_error.is_reset() {
+                flags |= H2_ERROR_FLAG_RESET;
+            }
+
+            return Some(Http2ErrorDetails {
+                code: h2_error.reason().map(u32::from),
+                flags,
+            });
+        }
+
+        current = candidate.source();
+    }
+
+    None
+}
 
 #[no_mangle]
 pub extern "C" fn yaha_get_last_error(
@@ -69,7 +105,7 @@ pub extern "C" fn yaha_init_context(
         version: YahaHttpVersion,
     ),
     on_receive: extern "C" fn(req_seq: i32, state: NonZeroIsize, length: usize, buf: *const u8, task_handle: usize),
-    on_complete: extern "C" fn(req_seq: i32, state: NonZeroIsize, reason: CompletionReason, h2_error_code: u32),
+    on_complete: extern "C" fn(req_seq: i32, state: NonZeroIsize, reason: CompletionReason, h2_error_code: u32, h2_error_flags: u32),
 ) -> *mut YahaNativeContext {
     let runtime_ctx = YahaNativeRuntimeContextInternal::from_raw_context(runtime_ctx);
     let ctx = Box::new(YahaNativeContextInternal::new(
@@ -88,7 +124,7 @@ pub extern "C" fn yaha_dispose_context(ctx: *mut YahaNativeContext) {
     ctx.on_receive = _sentinel_on_receive;
     ctx.on_status_code_and_headers_receive = _sentinel_on_status_code_and_headers_receive;
 }
-extern "C" fn _sentinel_on_complete(_: i32, _: NonZeroIsize, _: CompletionReason, _: u32) { panic!("The context has already disposed: on_complete"); }
+extern "C" fn _sentinel_on_complete(_: i32, _: NonZeroIsize, _: CompletionReason, _: u32, _: u32) { panic!("The context has already disposed: on_complete"); }
 extern "C" fn _sentinel_on_receive(_: i32, _: NonZeroIsize, _: usize, _: *const u8, _: usize) { panic!("The context has already disposed: on_receive"); }
 extern "C" fn _sentinel_on_status_code_and_headers_receive(_: i32, _: NonZeroIsize, _: i32, _: YahaHttpVersion) { panic!("The context has already disposed: on_status_code_and_headers_receive"); }
 
@@ -521,14 +557,14 @@ pub extern "C" fn yaha_request_begin(
                     let mut req_ctx = req_ctx.lock().unwrap();
                     req_ctx.last_error = Some("The client has not been built. You need to build it before sending the request.".to_string());
                 }
-                (ctx.on_complete)(seq, state, CompletionReason::Error, 0);
+                (ctx.on_complete)(seq, state, CompletionReason::Error, 0, 0);
                 return;
             }
 
             // Send a request and wait for response status and headers.
             let res = select! {
                 _ = cancellation_token.cancelled() => {
-                    (ctx.on_complete)(seq, state, CompletionReason::Aborted, 0);
+                    (ctx.on_complete)(seq, state, CompletionReason::Aborted, 0, 0);
                     return;
                 }
                 res = ctx.request(req) => {
@@ -574,7 +610,7 @@ pub extern "C" fn yaha_request_begin(
             while !body.is_end_stream() {
                 select! {
                     _ = cancellation_token.cancelled() => {
-                        (ctx.on_complete)(seq, state, CompletionReason::Aborted, 0);
+                        (ctx.on_complete)(seq, state, CompletionReason::Aborted, 0, 0);
                         return;
                     }
                     received = body.frame() => {
@@ -596,7 +632,7 @@ pub extern "C" fn yaha_request_begin(
                                                             let mut req_ctx = req_ctx.lock().unwrap();
                                                             req_ctx.last_error = Some(err);
                                                         }
-                                                        (ctx.on_complete)(seq, state, CompletionReason::Error, 0);
+                                                        (ctx.on_complete)(seq, state, CompletionReason::Error, 0, 0);
                                                         return;
                                                     }
                                                 },
@@ -606,7 +642,7 @@ pub extern "C" fn yaha_request_begin(
                                                         let mut req_ctx = req_ctx.lock().unwrap();
                                                         req_ctx.last_error = Some("on_receive() has not completed correctly.".to_string());
                                                     }
-                                                    (ctx.on_complete)(seq, state, CompletionReason::Error, 0);
+                                                    (ctx.on_complete)(seq, state, CompletionReason::Error, 0, 0);
                                                     return;
                                                 }
                                             }
@@ -642,13 +678,11 @@ pub extern "C" fn yaha_request_begin(
                                         }
 
                                         // If the `hyper::Error` has `h2::Error` as inner error, the error has HTTP/2 error code.
-                                        let reason = err.source()
-                                            .and_then(|e| e.downcast_ref::<h2::Error>())
-                                            .and_then(|e| e.reason());
+                                        let h2_error = extract_h2_error_details(&err);
+                                        let rc = h2_error.and_then(|e| e.code).unwrap_or_default();
+                                        let flags = h2_error.map(|e| e.flags).unwrap_or_default();
 
-                                        let rc = reason.map(|r| u32::from(r));
-
-                                        (ctx.on_complete)(seq, state, CompletionReason::Error, rc.unwrap_or_default());
+                                        (ctx.on_complete)(seq, state, CompletionReason::Error, rc, flags);
                                         return;
                                     }
                                 }
@@ -667,7 +701,7 @@ pub extern "C" fn yaha_request_begin(
                 req_ctx.try_complete();
             }
 
-            (ctx.on_complete)(seq, state, CompletionReason::Success, 0);
+            (ctx.on_complete)(seq, state, CompletionReason::Success, 0, 0);
 
             {
                 let mut req_ctx = req_ctx.lock().unwrap();
@@ -681,7 +715,7 @@ pub extern "C" fn yaha_request_begin(
 }
 
 fn complete_with_error(ctx: &mut YahaNativeContextInternal, req_ctx: Arc<Mutex<YahaNativeRequestContextInternal>>, seq: i32, state: NonZeroIsize, err: hyper_util::client::legacy::Error) {
-    let mut h2_error_code = None;
+    let mut h2_error = None;
 
     {
         let mut req_ctx = req_ctx.lock().unwrap();
@@ -689,17 +723,19 @@ fn complete_with_error(ctx: &mut YahaNativeContextInternal, req_ctx: Arc<Mutex<Y
         if let Some(error_inner) = err.source() {
             req_ctx.last_error = Some(format!("{}: {}", err.to_string(), error_inner.to_string()));
 
-            // If the Error has `h2::Error` as inner error, the error has HTTP/2 error code.
-            h2_error_code = error_inner.source()
-                .and_then(|e| e.downcast_ref::<h2::Error>())
-                .and_then(|e| e.reason())
-                .map(|e| u32::from(e));
+            h2_error = extract_h2_error_details(error_inner);
         } else {
             req_ctx.last_error = Some(err.to_string());
         }
     }
 
-    (ctx.on_complete)(seq, state, CompletionReason::Error, h2_error_code.unwrap_or_default());
+    (ctx.on_complete)(
+        seq,
+        state,
+        CompletionReason::Error,
+        h2_error.and_then(|e| e.code).unwrap_or_default(),
+        h2_error.map(|e| e.flags).unwrap_or_default(),
+    );
 }
 
 #[no_mangle]

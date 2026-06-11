@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Cysharp.Net.Http;
 
 namespace _YetAnotherHttpHandler.Test;
@@ -41,7 +41,15 @@ public class VersionNegotiationTest(ITestOutputHelper testOutputHelper) : UseTes
                 response.EnsureSuccessStatusCode();
             });
             Assert.NotNull(ex);
-            Assert.IsType<HttpRequestException>(ex);
+            if (response is null)
+            {
+                Assert.IsType<YetAnotherHttpRequestException>(ex);
+                Assert.IsType<HttpRequestException>(ex.InnerException);
+            }
+            else
+            {
+                Assert.IsType<HttpRequestException>(ex);
+            }
         }
         else
         {

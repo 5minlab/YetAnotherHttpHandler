@@ -266,7 +266,8 @@ public abstract class Http2TestBase(ITestOutputHelper testOutputHelper) : UseTes
         var ex = await Record.ExceptionAsync(async () => await httpClient.SendAsync(request).WaitAsync(TimeoutToken));
 
         // Assert
-        Assert.IsType<HttpRequestException>(ex);
+        Assert.IsType<YetAnotherHttpRequestException>(ex);
+        Assert.IsType<HttpRequestException>(ex.InnerException);
     }
 
     [Fact]

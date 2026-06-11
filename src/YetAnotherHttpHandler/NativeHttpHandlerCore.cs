@@ -523,9 +523,9 @@ namespace Cysharp.Net.Http
         }
 
         [MonoPInvokeCallback(typeof(NativeMethods.yaha_init_context_on_complete_delegate))]
-        private static unsafe void OnComplete(int reqSeq, IntPtr state, CompletionReason reason, uint h2ErrorCode)
+        private static unsafe void OnComplete(int reqSeq, IntPtr state, CompletionReason reason, uint h2ErrorCode, uint h2ErrorFlags)
         {
-            if (YahaEventSource.Log.IsEnabled()) YahaEventSource.Log.Info($"[ReqSeq:{reqSeq}:State:0x{state:X}] Response completed: Reason={reason}; H2ErrorCode=0x{h2ErrorCode:x}");
+            if (YahaEventSource.Log.IsEnabled()) YahaEventSource.Log.Info($"[ReqSeq:{reqSeq}:State:0x{state:X}] Response completed: Reason={reason}; H2ErrorCode=0x{h2ErrorCode:x}; H2ErrorFlags=0x{h2ErrorFlags:x}");
 
             var requestContext = RequestContext.FromHandle(state);
             try
@@ -590,7 +590,7 @@ namespace Cysharp.Net.Http
                         var buf = NativeMethods.yaha_get_last_error(ctx, reqCtx);
                         try
                         {
-                            requestContext.CompleteAsFailed(UnsafeUtilities.GetStringFromUtf8Bytes(buf->AsSpan()), h2ErrorCode);
+                            requestContext.CompleteAsFailed(UnsafeUtilities.GetStringFromUtf8Bytes(buf->AsSpan()), h2ErrorCode, (Http2ErrorFlags)h2ErrorFlags);
                         }
                         finally
                         {
@@ -611,7 +611,7 @@ namespace Cysharp.Net.Http
                 }
                 else
                 {
-                    requestContext.CompleteAsFailed("Canceled", 0);
+                    requestContext.CompleteAsFailed("Canceled", 0, Http2ErrorFlags.None);
                 }
             }
             finally
@@ -620,7 +620,7 @@ namespace Cysharp.Net.Http
 
                 // NOTE: We need to dispose the request context in the thread pool.
                 //       If we call Dispose on the native thread, we will release the native handles and crash.
-                ThreadPool.UnsafeQueueUserWorkItem(static r => ((RequestContext)r).Dispose(), requestContext);
+                ThreadPool.UnsafeQueueUserWorkItem(static r => ((RequestContext)r!).Dispose(), requestContext);
             }
         }
 
